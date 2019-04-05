@@ -1,6 +1,8 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <string>
+#include <unistd.h>
 
 #define SYNC1 0xB5
 #define SYNC2 0x62 
@@ -26,7 +28,7 @@
 
 #define POS_PAYLOAD_LEN 28
 #define POS_MSG1_OFFSET 4
-#define POS_MSG2_LEN 8
+#define POS_MSG1_LEN 8
 
 #define EULER_PAYLOAD_LEN 20
 #define EULER_MSG1_OFFSET 4
@@ -36,7 +38,7 @@ class Parser{
     private: 
         struct NAV{
 
-        }
+        };
 
         std::string portname;
         int file_descr, nRead, msgcount;
@@ -46,18 +48,18 @@ class Parser{
     public:
         Parser(std::string PortName);
         void read_data(char* buf, int fd);
-        void parse_HD_EULER(char* buf, int cursor);
-        void parse_HD_POS(char* buf, int cursor);
-        void parse_EULER(char* buf, int cursor);
-        void parse_POS(char* buf, int cursor);
-}
+        std::vector<int> parse_HD_EULER();
+        std::vector<int> parse_HD_POS();
+        std::vector<int> parse_EULER();
+        std::vector<int> parse_POS();
+};
 
 
 void Parser::read_data(char* buf, int fd){
     int cursor;
     
     //flags for catching sync bytes
-    auto FIRST_SYNC = false, SEC_SYNC = false;
+    bool FIRST_SYNC = false, SEC_SYNC = false;
 
     while(1){
     
@@ -98,12 +100,11 @@ std::vector<int> Parser::parse_HD_EULER(){
     // Final HD euler angles
     std::vector<int> ece;
     
-    auto i = Parser::cursor + HD_EULER_OFFSET;
-
+    
     //TODO: dafuck don't know how to read bytes
     
-    for(auto i = Parser::cursor + HD_EULER_OFFSET; i < Parser::cursor + HD_EULER_MSG1_LEN; i+=4){
-    
+    for (auto i = Parser::cursor + HD_EULER_MSG1_OFFSET; i < Parser::cursor + HD_EULER_MSG1_OFFSET + HD_EULER_MSG1_LEN; i += 4){
+
        pre_ece.push_back(int((unsigned char)(Parser::buf[i]) << 24 |
                 (unsigned char)(Parser::buf[i+1]) << 16 |
                 (unsigned char)(Parser::buf[i+2]) << 8 |
@@ -111,31 +112,47 @@ std::vector<int> Parser::parse_HD_EULER(){
     }
 
     //TODO
-    for(auto i = Parser::cursor + HD_EULER_OFFSET + HD_EULER_MSG1_LEN;
-            i < Parser::cursor + HD_EULER_MSG2_LEN; i++){
-                pre_ece.push_back(int((unsigned char)(Parser::buf[i]) << 24 |
-                                      (unsigned char)(Parser::buf[i+1]) << 16 |
-                                      (unsigned char)(Parser::buf[i+2]) << 8 |
-                                      (unsigned char)(Parser::buf[i+3])));
+    for(auto i = Parser::cursor + HD_EULER_MSG2_OFFSET;
+            i < Parser::cursor + HD_EULER_MSG2_OFFSET + HD_EULER_MSG2_LEN; i++){
+        pre_ece.push_back(int((unsigned char)(Parser::buf[i])));
 
     }
 
-    for (auto i = 0; i < 3; i+=1){
-        ece.push_back(pre_ece[i] + (pre_ece[i+3] * 1e-2))
+    for (auto i = 0; i < 3; i++){
+        ece.push_back(pre_ece[i] + (pre_ece[i+3] * 1e-2));
     }
 
     Parser::cursor += HD_EULER_PAYLOAD_LEN;
-    return ece
+    return ece;
 }
 
 std::vector<int> Parser::parse_HD_POS(){
     std::vector<int> pre_pos;
 
-    std::vactor<int> pos;
+    std::vector<int> pos;
 
-    for (auto i = Parser::cursor + HD_POS_OFFSET; i < Parser::cursor + HD_POS_MSG_LEN; i+=;)
+    for (auto i = Parser::cursor + HD_POS_MSG1_OFFSET; i < Parser::cursor + HD_POS_MSG1_OFFSET + HD_POS_MSG1_LEN; i+=4){
+        pre_pos.push_back(int((unsigned char)(Parser::buf[i]) << 24 |
+                              (unsigned char)(Parser::buf[i+1]) << 16 |
+                              (unsigned char)(Parser::buf[i+2]) << 8 |
+                              (unsigned char)(Parser::buf[i+3])));
+    }
+
+    for (auto i = Parser::cursor+HD_POS_MSG2_OFFSET; i < Parser::cursor + HD_POS_MSG2_OFFSET + HD_POS_MSG2_LEN; i++){
+        pre_pos.push_back(int((unsigned char)(Parser::buf[i])));
+    }
+
+    for (auto i = 0; i < 2; i++){
+        pos.push_back(pre_pos[i] + (pre_pos[i+2] * 1e-2));
+    }
+
+    Parser::cursor += HD_POS_PAYLOAD_LEN;
+    return pos;
 }
 
+std::vector<int> Parser::parser_POS(){
+    std::vector
+}
 /*
 Parser::Parser(std::string PortName = "/dev/ttyACM0"){
     Parser::file_descr = open(PortName, O_RDWR);
@@ -146,3 +163,8 @@ Parser::Parser(std::string PortName = "/dev/ttyACM0"){
     
 }
 */
+
+int main(){
+
+    return 0;
+}
