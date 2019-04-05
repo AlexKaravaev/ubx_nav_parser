@@ -52,6 +52,7 @@ class Parser{
         std::vector<int> parse_HD_POS();
         std::vector<int> parse_EULER();
         std::vector<int> parse_POS();
+        std::vector<int> parse_HD(bool if_Euler);
 };
 
 
@@ -150,9 +151,57 @@ std::vector<int> Parser::parse_HD_POS(){
     return pos;
 }
 
-std::vector<int> Parser::parser_POS(){
-    std::vector
+
+// Generic func to parse hd message
+std::vector<int> Parser::parse_HD(bool if_Euler){
+    std::vector<int> pre_result;
+    std::vector<int> result;
+
+    auto msg1_offset = (if_Euler) ? HD_EULER_MSG1_OFFSET : HD_POS_MSG1_OFFSET;
+
+    auto msg1_len = (if_Euler) ? HD_EULER_MSG1_LEN : HD_POS_MSG1_LEN;
+
+    auto msg2_offset = (if_Euler) ? HD_EULER_MSG2_OFFSET : HD_POS_MSG2_OFFSET;
+
+    auto msg2_len = (if_Euler) ? HD_EULER_MSG2_LEN : HD_POS_MSG2_LEN;
+
+    auto offset = (if_Euler) ? 3 : 2;
+    
+    auto payload = (if_Euler) ? HD_EULER_PAYLOAD : HD_POS_PAYLOAD;
+
+    for (auto i = Parser::cursor + msg1_offset; i < Parser::cursor +                          msg1_offset + msg1_len; i+=4){
+       pre_result.push_back(int((unsigned char)(Parser::buf[i]) << 24 |
+                             (unsigned char)(Parser::buf[i+1]) << 16 |
+                             (unsigned char)(Parser::buf[i+2]) << 8 |
+                             (unsigned char)(Parser::buf[i+3])));
+     }
+
+    for (auto i = Parser::cursor + msg2_offset; i < Parser::cursor + msg2_offset + msg2_len; i++){
+        pre_result.push_back(int((unsigned char)(Parser::buf[i])));
+     } 
+
+    for (auto i = 0; i < 2; i++){
+        result.push_back(pre_result[i] + (pre_result[i+offset] * 1e-2));
+    }
+
+    Parser::cursor += payload;
+
+    return result;
 }
+
+std::vector<int> Parser::parse(bool if_Euler){
+    std::vector<int> result;
+
+    auto msg_offset = (if_Euler) ? EULER_MSG_OFFSET : POS_MSG_OFFSET;
+
+    auto msg_len = (if_Euler) ? EULER_MSG_LEN : POS_MSG_LEN;
+
+    auto payload = (if_Euler) ? EULER_MSG_PAYLOAD : POS_MSG_PAYLOAD;
+
+    for (auto i = Parser::cursor + msg_offset; i < Parser::cursor + msg_offset + msg_len;)
+}
+
+
 /*
 Parser::Parser(std::string PortName = "/dev/ttyACM0"){
     Parser::file_descr = open(PortName, O_RDWR);
