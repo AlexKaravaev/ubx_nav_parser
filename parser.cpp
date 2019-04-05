@@ -12,12 +12,25 @@
 #define POSECEF 0x01// Msg class with usual euler angles
 #define POSLLH 0x02 // Msg class with usual position
 
-#define HD_EULER_OFFSET 8 
 #define HD_EULER_PAYLOAD_LEN 28
+#define HD_EULER_MSG1_OFFSET 8
+#define HD_EULER_MSG1_LEN 12
+#define HD_EULER_MSG2_OFFSET 20
+#define HD_EULER_MSG2_LEN 3
 
-#define HD_POS_OFFSET 8
+#define HD_POS_MSG1_OFFSET 8
+#define HD_POS_MSG1_LEN 8
+#define HD_POS_MSG2_OFFSET 24
+#define HD_POS_MSG2_LEN 2
 #define HD_POS_PAYLOAD_LEN 36
 
+#define POS_PAYLOAD_LEN 28
+#define POS_MSG1_OFFSET 4
+#define POS_MSG2_LEN 8
+
+#define EULER_PAYLOAD_LEN 20
+#define EULER_MSG1_OFFSET 4
+#define EULER_MSG1_LEN 12
 
 class Parser{
     private: 
@@ -89,7 +102,7 @@ std::vector<int> Parser::parse_HD_EULER(){
 
     //TODO: dafuck don't know how to read bytes
     
-    for(auto i = Parser::cursor + HD_EULER_OFFSET; i < Parser::nRead; i+=4){
+    for(auto i = Parser::cursor + HD_EULER_OFFSET; i < Parser::cursor + HD_EULER_MSG1_LEN; i+=4){
     
        pre_ece.push_back(int((unsigned char)(Parser::buf[i]) << 24 |
                 (unsigned char)(Parser::buf[i+1]) << 16 |
@@ -97,16 +110,30 @@ std::vector<int> Parser::parse_HD_EULER(){
                 (unsigned char)(Parser::buf[i+3])));
     }
 
+    //TODO
+    for(auto i = Parser::cursor + HD_EULER_OFFSET + HD_EULER_MSG1_LEN;
+            i < Parser::cursor + HD_EULER_MSG2_LEN; i++){
+                pre_ece.push_back(int((unsigned char)(Parser::buf[i]) << 24 |
+                                      (unsigned char)(Parser::buf[i+1]) << 16 |
+                                      (unsigned char)(Parser::buf[i+2]) << 8 |
+                                      (unsigned char)(Parser::buf[i+3])));
+
+    }
+
     for (auto i = 0; i < 3; i+=1){
         ece.push_back(pre_ece[i] + (pre_ece[i+3] * 1e-2))
     }
 
-    Parser::cursor += HD_EULER_PAULOAD_LEN;
+    Parser::cursor += HD_EULER_PAYLOAD_LEN;
     return ece
 }
 
 std::vector<int> Parser::parse_HD_POS(){
-        
+    std::vector<int> pre_pos;
+
+    std::vactor<int> pos;
+
+    for (auto i = Parser::cursor + HD_POS_OFFSET; i < Parser::cursor + HD_POS_MSG_LEN; i+=;)
 }
 
 /*
