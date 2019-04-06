@@ -10,7 +10,7 @@
 #include <fcntl.h>
 
 #define SYNC1 0xB5
-#define SYNC2 0x62 
+#define SYNC2 0x62
 #define BAUDRATE B460800
 #define NAV_CLASS 0x01
 
@@ -27,7 +27,7 @@
 
 #define HD_POS_MSG_PAYLOAD_LEN 36
 #define HD_POS_MSG1_OFFSET 8
-#define HD_POS_MSG1_LEN 8 
+#define HD_POS_MSG1_LEN 8
 #define HD_POS_MSG2_OFFSET 24
 #define HD_POS_MSG2_LEN 2
 
@@ -43,14 +43,20 @@
 
 #define MSG_LEN 2
 
+#define BLEN 1024
+#define MLEN 1024
+
 class Parser{
-    private: 
+    private:
 
         std::string portname;
         int test_fd, file_descr, nRead, msgcount;
-        char buf[1024];
+        unsigned char rbuf[1024];
+        unsigned char *rp = &rbuf[BLEN];
+        int bufcnt = 0;
         int cursor;
-        
+
+
     public:
         Parser(std::string filename);
         void read_data();
@@ -60,55 +66,58 @@ class Parser{
 };
 
 
+static unsigned char Parser::readbyte(){
+    if
+}
 void Parser::read_data(){
     int cursor;
 
     while(1){
-    
-        // Parser::nRead = read(Parser::file_descr, Parser::buf, 255);
-        Parser::cursor = 0;
-        std::vector<int> res;
-        //std::cout << Parser::cursor << " " << Parser::nRead << std::endl;
-         
-        while(Parser::cursor < Parser::nRead){
 
-            //std::cout << Parser::buf[Parser::cursor];
-            //std::cout << (char)SYNC1;
-            
-            if (Parser::buf[cursor] == (char)SYNC1){
-                //std::cout << "foo";
-                //Parser::cursor++;
-                if(Parser::buf[cursor++] == (char)SYNC2){
-                    std::cout<<"bar";
-                    Parser::cursor++;
-                    if(Parser::buf[cursor++] == (char)NAV_CLASS){
-                        Parser::cursor++;
-                        Parser::cursor++;
-                        switch(Parser::buf[cursor]){
-                            case HPPOSECEF:
-                                res = Parser::parse_HD(true);
-                            case HPPOSLLH:
-                                res = Parser::parse_HD(false);
-                            case POSECEF:
-                                res = Parser::parse(true);
-                            case POSLLH:
-                                res = Parser::parse(false);
-                            default:
-                                continue;
-                        }
-                        std::cout << "Message: ";
-                        for(auto i = res.begin(); i != res.end(); ++i){
-                            std::cout << *i << ' ';
-                        }
-                        std::cout << "\n";
-                        Parser::cursor += CHECKSUM_LEN; 
-                        
-                    }
-                }
-            }
-            Parser::cursor++;
-        
+        while (this-<getbyte != SYNC1)
+            // Wait till 1st sync byte;
+retry_sync:
+        if ((sync = this->getbyte()) != SYNC2){
+            if(sync == SYNC1)
+                goto retry_sync;
+            else
+                continue;
         }
+
+        this->msg_class = this->getbyte();
+        this->id = this->getbyte();
+
+        this->length = this->getbyte();
+        this->length += this->getbyte() << 8;
+
+        if (this->length > MLEN)
+            continue;
+
+        for (auto i = 0; i < this->length; i++){
+            this->msg[i] = this->getbyte();
+        }
+
+        this->chka = this->getbyte();
+        this->chlb = this->getbyte();
+
+        //TODO: add checksum validation
+        if (true){
+            switch(this->msg_class){
+                case HPPOSECEF:
+                    res = Parser::parse_HD(true);
+                case HPPOSLLH:
+                    res = Parser::parse_HD(false);
+                case POSECEF:
+                    res = Parser::parse(true);
+                case POSLLH:
+                    res = Parser::parse(false);
+                default:
+                    continue;
+            }
+        }
+
+        std::cout << "error in checksum validation" << std::endl;
+
     }
 }
 
@@ -130,7 +139,7 @@ std::vector<int> Parser::parse_HD(bool if_Euler){
     msg2_offset += MSG_LEN;
 
     auto offset = (if_Euler) ? 3 : 2;
-    
+
     auto payload = (if_Euler) ? HD_EULER_MSG_PAYLOAD_LEN : HD_POS_MSG_PAYLOAD_LEN;
 
     for (auto i = Parser::cursor + msg1_offset; i < Parser::cursor +                          msg1_offset + msg1_len; i+=4){
@@ -142,7 +151,7 @@ std::vector<int> Parser::parse_HD(bool if_Euler){
 
     for (auto i = Parser::cursor + msg2_offset; i < Parser::cursor + msg2_offset + msg2_len; i++){
         pre_result.push_back(int((signed char)(Parser::buf[i])));
-     } 
+     }
 
     for (auto i = 0; i < 2; i++){
         result.push_back(pre_result[i] + (pre_result[i+offset] * 1e-2));
@@ -171,7 +180,7 @@ std::vector<int> Parser::parse(bool if_Euler){
                              (signed char)(Parser::buf[i+3])));
     }
 
-    Parser::cursor += payload; 
+    Parser::cursor += payload;
 
     return result;
 }
@@ -180,7 +189,7 @@ std::vector<int> Parser::parse(bool if_Euler){
 
 Parser::Parser(std::string filename = "testing.txt"){
     std::ifstream infile(filename);
-    
+
     infile.seekg(0, infile.end);
     this->nRead = infile.tellg();
     infile.seekg(0, infile.beg);
@@ -189,7 +198,7 @@ Parser::Parser(std::string filename = "testing.txt"){
         this->nRead = sizeof(this->buf);
 
     infile.read(this->buf, this->nRead);
-    
+
 
 }
 
@@ -201,7 +210,7 @@ void Parser::write_for_test(std::string filename = "testing.txt"){
 
     for (auto i=0; i < POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
         data.push_back(foo);
-    } 
+    }
 
     std::ofstream of(filename);
 
