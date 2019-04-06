@@ -41,6 +41,7 @@
 
 #define CHECKSUM_LEN 2
 
+#define MSG_LEN 2
 
 class Parser{
     private: 
@@ -51,7 +52,7 @@ class Parser{
         int cursor;
         
     public:
-        Parser(std::string PortName);
+        Parser(std::string filename);
         void read_data();
         std::vector<int> parse_HD(bool if_Euler);
         std::vector<int> parse(bool if_Euler);
@@ -64,34 +65,48 @@ void Parser::read_data(){
 
     while(1){
     
-        Parser::nRead = read(Parser::file_descr, Parser::buf, 255);
+        // Parser::nRead = read(Parser::file_descr, Parser::buf, 255);
         Parser::cursor = 0;
-        
+        std::vector<int> res;
+        //std::cout << Parser::cursor << " " << Parser::nRead << std::endl;
+         
         while(Parser::cursor < Parser::nRead){
 
-            if (Parser::buf[cursor++] == SYNC1){
-                Parser::cursor++;
-                if(Parser::buf[cursor++] == SYNC2){
+            //std::cout << Parser::buf[Parser::cursor];
+            //std::cout << (char)SYNC1;
+            
+            if (Parser::buf[cursor] == (char)SYNC1){
+                //std::cout << "foo";
+                //Parser::cursor++;
+                if(Parser::buf[cursor++] == (char)SYNC2){
+                    std::cout<<"bar";
                     Parser::cursor++;
-                    if(Parser::buf[cursor++] == NAV_CLASS){
+                    if(Parser::buf[cursor++] == (char)NAV_CLASS){
                         Parser::cursor++;
                         Parser::cursor++;
                         switch(Parser::buf[cursor]){
                             case HPPOSECEF:
-                                Parser::parse_HD(true);
+                                res = Parser::parse_HD(true);
                             case HPPOSLLH:
-                                Parser::parse_HD(false);
+                                res = Parser::parse_HD(false);
                             case POSECEF:
-                                Parser::parse(true);
+                                res = Parser::parse(true);
                             case POSLLH:
-                                Parser::parse(false);
+                                res = Parser::parse(false);
                             default:
                                 continue;
-                        Parser::cursor += CHECKSUM_LEN; 
                         }
+                        std::cout << "Message: ";
+                        for(auto i = res.begin(); i != res.end(); ++i){
+                            std::cout << *i << ' ';
+                        }
+                        std::cout << "\n";
+                        Parser::cursor += CHECKSUM_LEN; 
+                        
                     }
                 }
             }
+            Parser::cursor++;
         
         }
     }
@@ -111,19 +126,22 @@ std::vector<int> Parser::parse_HD(bool if_Euler){
 
     auto msg2_len = (if_Euler) ? HD_EULER_MSG2_LEN : HD_POS_MSG2_LEN;
 
+    msg1_offset += MSG_LEN;
+    msg2_offset += MSG_LEN;
+
     auto offset = (if_Euler) ? 3 : 2;
     
     auto payload = (if_Euler) ? HD_EULER_MSG_PAYLOAD_LEN : HD_POS_MSG_PAYLOAD_LEN;
 
     for (auto i = Parser::cursor + msg1_offset; i < Parser::cursor +                          msg1_offset + msg1_len; i+=4){
-       pre_result.push_back(int((Parser::buf[i]) << 24 |
-                                (Parser::buf[i+1]) << 16 |
-                                (Parser::buf[i+2]) << 8 |
-                                (Parser::buf[i+3])));
+       pre_result.push_back(int((signed char)(Parser::buf[i]) << 24 |
+                                (signed char)(Parser::buf[i+1]) << 16 |
+                                (signed char)(Parser::buf[i+2]) << 8 |
+                                (signed char)(Parser::buf[i+3])));
      }
 
     for (auto i = Parser::cursor + msg2_offset; i < Parser::cursor + msg2_offset + msg2_len; i++){
-        pre_result.push_back(int((Parser::buf[i])));
+        pre_result.push_back(int((signed char)(Parser::buf[i])));
      } 
 
     for (auto i = 0; i < 2; i++){
@@ -144,11 +162,13 @@ std::vector<int> Parser::parse(bool if_Euler){
 
     auto payload = (if_Euler) ? EULER_MSG_PAYLOAD_LEN : POS_MSG_PAYLOAD_LEN;
 
+    msg_offset += MSG_LEN;
+
     for (auto i = Parser::cursor + msg_offset; i < Parser::cursor + msg_offset + msg_len; i+=4){
-        result.push_back(int((Parser::buf[i]) << 24 |
-                             (Parser::buf[i+1]) << 16 |
-                             (Parser::buf[i+2]) << 8 |
-                             (Parser::buf[i+3])));
+        result.push_back(int((signed char)(Parser::buf[i]) << 24 |
+                             (signed char)(Parser::buf[i+1]) << 16 |
+                             (signed char)(Parser::buf[i+2]) << 8 |
+                             (signed char)(Parser::buf[i+3])));
     }
 
     Parser::cursor += payload; 
@@ -158,19 +178,25 @@ std::vector<int> Parser::parse(bool if_Euler){
 
 
 
-Parser::Parser(std::string PortName = "/dev/ttyACM0"){
-    Parser::file_descr = open(PortName.c_str(), O_RDWR);
+Parser::Parser(std::string filename = "testing.txt"){
+    std::ifstream infile(filename);
     
-    if (Parser::file_descr < 0){
-        std::cout << "Cannot open device at" << PortName << "\n Terminating...";
-    }
+    infile.seekg(0, infile.end);
+    this->nRead = infile.tellg();
+    infile.seekg(0, infile.beg);
+
+    if (this->nRead > sizeof(this->buf))
+        this->nRead = sizeof(this->buf);
+
+    infile.read(this->buf, this->nRead);
     
+
 }
 
 void Parser::write_for_test(std::string filename = "testing.txt"){
     Parser::test_fd = open(filename.c_str(), O_RDWR);
 
-    std::vector<char> data = {SYNC1, SYNC2, NAV_CLASS, POSECEF};
+    std::vector<char> data = {(char)SYNC1, (char)SYNC2, (char)NAV_CLASS, (char)POSECEF};
     signed char foo = 0x01;
 
     for (auto i=0; i < POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
@@ -179,7 +205,7 @@ void Parser::write_for_test(std::string filename = "testing.txt"){
 
     std::ofstream of(filename);
 
-    std::ostream_iterator<std::vector<char>> out_iterator(of, "\n");
+    std::ostream_iterator<char> out_iterator(of, "");
 
     std::copy(data.begin(), data.end(), out_iterator);
 }
