@@ -54,78 +54,128 @@ class Parser{
         unsigned char rbuf[1024];
         unsigned char *rp = &rbuf[BLEN];
         int bufcnt = 0;
-        int cursor;
-
+        unsigned char msg_class;
+        unsigned char id;
+        int length;
+        unsigned char chka;
+        unsigned char chlb;
+        unsigned char msg[MLEN];
+        std::vector<int> res;
+        std::vector<float> hd_res;
+        unsigned char sync;
+        std::string fn;
+        std::ifstream infile;
 
     public:
         Parser(std::string filename);
         void read_data();
-        std::vector<int> parse_HD(bool if_Euler);
+        std::vector<float> parse_HD(bool if_Euler);
         std::vector<int> parse(bool if_Euler);
         void write_for_test(std::string filename);
+        unsigned char getbyte();
 };
 
 
-static unsigned char Parser::readbyte(){
-    if
+unsigned char Parser::getbyte(){
+
+    //std::cout << (rp - rbuf) << '\n';
+    if ((rp - rbuf) >= bufcnt){
+
+        bufcnt = read(test_fd, rbuf, BLEN);
+
+        if (bufcnt <= 0){
+            //std::cout << "Error in getbyte()\n";
+            ;
+        }
+        else{
+
+        }
+        //std::cout << "buf: " << bufcnt << std::endl;
+        rp = rbuf;
+        //std::cout << (int)(*rp) << ' ';
+    }
+
+    //'std::cout << (int)(*rp) << ' ';
+    std::cout << rbuf[0];
+    return *rp++;
 }
+
 void Parser::read_data(){
-    int cursor;
 
     while(1){
 
-        while (this-<getbyte != SYNC1)
-            // Wait till 1st sync byte;
+        while (getbyte() != 0xB5)
+          /* wait*/ ;
 retry_sync:
-        if ((sync = this->getbyte()) != SYNC2){
+
+        if ((sync = getbyte()) != SYNC2){
             if(sync == SYNC1)
                 goto retry_sync;
             else
                 continue;
         }
 
-        this->msg_class = this->getbyte();
-        this->id = this->getbyte();
+        msg_class = getbyte();
+        id = getbyte();
+        length = getbyte();
+        length += getbyte() << 8;
 
-        this->length = this->getbyte();
-        this->length += this->getbyte() << 8;
-
-        if (this->length > MLEN)
+        if (length > MLEN){
             continue;
-
-        for (auto i = 0; i < this->length; i++){
-            this->msg[i] = this->getbyte();
         }
-
-        this->chka = this->getbyte();
-        this->chlb = this->getbyte();
-
+        for (auto i = 0; i < length; i++){
+            msg[i] = getbyte();
+        }
+        std::cout <<"Msg class: " << (int)msg_class << " \n";
+        std::cout <<"id class: " << (int)id << " \n";
+        std::cout <<"length: " << (int)length << " \n";
+        chka = getbyte();
+        chlb = getbyte();
         //TODO: add checksum validation
         if (true){
-            switch(this->msg_class){
+            switch(id){
                 case HPPOSECEF:
-                    res = Parser::parse_HD(true);
+                    hd_res = Parser::parse_HD(true);
+                    for(auto const& val1: hd_res){
+                      std::cout << val1 << " ";
+                    }
                 case HPPOSLLH:
-                    res = Parser::parse_HD(false);
+                    hd_res = Parser::parse_HD(false);
+                    // for(auto const& val2: hd_res){
+                    //   std::cout << val2 << " ";
+                    // }
                 case POSECEF:
+                    std::cout << "ff";
                     res = Parser::parse(true);
+                    // for(auto const& val3: res){
+                    //   std::cout << val3 << " ";
+                    // }
                 case POSLLH:
+                    std::cout << "aff";
                     res = Parser::parse(false);
-                default:
-                    continue;
+                    // for(auto const& val4: res){
+                    //   std::cout << val4 << " ";
+                    // }
             }
+            for(auto const& val1: hd_res){
+              std::cout << val1 << " ";
+            }
+            for(auto const& val4: res){
+              std::cout << val4 << " ";
+            }
+            std::cout<<'\n';
         }
 
-        std::cout << "error in checksum validation" << std::endl;
+        std::cout << "error in checksum validation\n" << std::endl;
 
     }
 }
 
 
 // Generic func to parse hd message
-std::vector<int> Parser::parse_HD(bool if_Euler){
+std::vector<float> Parser::parse_HD(bool if_Euler){
     std::vector<int> pre_result;
-    std::vector<int> result;
+    std::vector<float> result;
 
     auto msg1_offset = (if_Euler) ? HD_EULER_MSG1_OFFSET : HD_POS_MSG1_OFFSET;
 
@@ -142,22 +192,21 @@ std::vector<int> Parser::parse_HD(bool if_Euler){
 
     auto payload = (if_Euler) ? HD_EULER_MSG_PAYLOAD_LEN : HD_POS_MSG_PAYLOAD_LEN;
 
-    for (auto i = Parser::cursor + msg1_offset; i < Parser::cursor +                          msg1_offset + msg1_len; i+=4){
-       pre_result.push_back(int((signed char)(Parser::buf[i]) << 24 |
-                                (signed char)(Parser::buf[i+1]) << 16 |
-                                (signed char)(Parser::buf[i+2]) << 8 |
-                                (signed char)(Parser::buf[i+3])));
+    for (auto i = msg1_offset; i <  msg1_offset + msg1_len; i+=4){
+       pre_result.push_back(int((signed char)(this->msg[i]) << 24 |
+                                (signed char)(this->msg[i+1]) << 16 |
+                                (signed char)(this->msg[i+2]) << 8 |
+                                (signed char)(this->msg[i+3])));
      }
 
-    for (auto i = Parser::cursor + msg2_offset; i < Parser::cursor + msg2_offset + msg2_len; i++){
-        pre_result.push_back(int((signed char)(Parser::buf[i])));
+    for (auto i = msg2_offset; i < msg2_offset + msg2_len; i++){
+        pre_result.push_back(int((signed char)(this->msg[i])));
      }
 
     for (auto i = 0; i < 2; i++){
         result.push_back(pre_result[i] + (pre_result[i+offset] * 1e-2));
     }
-
-    Parser::cursor += payload;
+    std::cout << "shd: " << result.size() << std::endl;
 
     return result;
 }
@@ -173,43 +222,62 @@ std::vector<int> Parser::parse(bool if_Euler){
 
     msg_offset += MSG_LEN;
 
-    for (auto i = Parser::cursor + msg_offset; i < Parser::cursor + msg_offset + msg_len; i+=4){
-        result.push_back(int((signed char)(Parser::buf[i]) << 24 |
-                             (signed char)(Parser::buf[i+1]) << 16 |
-                             (signed char)(Parser::buf[i+2]) << 8 |
-                             (signed char)(Parser::buf[i+3])));
+    for (auto i = msg_offset; i < msg_offset + msg_len; i+=4){
+        result.push_back(int((signed char)(this->msg[i]) << 24 |
+                             (signed char)(this->msg[i+1]) << 16 |
+                             (signed char)(this->msg[i+2]) << 8 |
+                             (signed char)(this->msg[i+3])));
     }
 
-    Parser::cursor += payload;
-
+    std::cout << "s: " << result.size() << std::endl;
     return result;
 }
 
 
 
 Parser::Parser(std::string filename = "testing.txt"){
-    std::ifstream infile(filename);
-
-    infile.seekg(0, infile.end);
-    this->nRead = infile.tellg();
-    infile.seekg(0, infile.beg);
-
-    if (this->nRead > sizeof(this->buf))
-        this->nRead = sizeof(this->buf);
-
-    infile.read(this->buf, this->nRead);
-
+    //std::ifstream Parser::infile(filename);
+    test_fd = open(filename.c_str(), O_RDWR);
 
 }
 
 void Parser::write_for_test(std::string filename = "testing.txt"){
     Parser::test_fd = open(filename.c_str(), O_RDWR);
 
-    std::vector<char> data = {(char)SYNC1, (char)SYNC2, (char)NAV_CLASS, (char)POSECEF};
+    std::vector<int> data = {0x00, SYNC1, SYNC2, NAV_CLASS, POSECEF,
+                POS_MSG_PAYLOAD_LEN & 0x00FF, (POS_MSG_PAYLOAD_LEN & 0xFF00) >> 8};
     signed char foo = 0x01;
 
     for (auto i=0; i < POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
         data.push_back(foo);
+    }
+
+    // JUNK
+    data.push_back(0x00);
+    data.push_back(0x23);
+
+    data.push_back(SYNC1);
+    data.push_back(SYNC2);
+    data.push_back(NAV_CLASS);
+    data.push_back(POSECEF);
+    data.push_back(POS_MSG_PAYLOAD_LEN & 0x00FF);
+    data.push_back((POS_MSG_PAYLOAD_LEN & 0xFF00) >> 8);
+    for (auto i=0; i < POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
+        data.push_back(foo);
+    }
+
+    data.push_back(SYNC1);
+    data.push_back(SYNC2);
+    data.push_back(NAV_CLASS);
+    data.push_back(HPPOSLLH);
+    data.push_back(HD_POS_MSG_PAYLOAD_LEN & 0x00FF);
+    data.push_back((HD_POS_MSG_PAYLOAD_LEN & 0xFF00) >> 8);
+
+    for (auto i=0; i < HD_POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
+        if(i > 7 && i <17)
+          data.push_back(foo);
+        else
+          data.push_back(0x02);
     }
 
     std::ofstream of(filename);
