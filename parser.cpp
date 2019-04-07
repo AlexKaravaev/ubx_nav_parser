@@ -60,8 +60,7 @@ class Parser{
         unsigned char chka;
         unsigned char chlb;
         unsigned char msg[MLEN];
-        std::vector<int> res;
-        std::vector<float> hd_res;
+        std::vector<long double> res;
         unsigned char sync;
         std::string fn;
         std::ifstream infile;
@@ -69,16 +68,14 @@ class Parser{
     public:
         Parser(std::string filename);
         void read_data();
-        std::vector<float> parse_HD(bool if_Euler);
-        std::vector<int> parse(bool if_Euler);
+        std::vector<long double> parse_HD(bool if_Euler);
+        std::vector<long double> parse(bool if_Euler);
         void write_for_test(std::string filename);
         unsigned char getbyte();
 };
 
 
 unsigned char Parser::getbyte(){
-
-    //std::cout << (rp - rbuf) << '\n';
     if ((rp - rbuf) >= bufcnt){
 
         bufcnt = read(test_fd, rbuf, BLEN);
@@ -88,14 +85,11 @@ unsigned char Parser::getbyte(){
             ;
         }
         else{
-
         }
-        //std::cout << "buf: " << bufcnt << std::endl;
         rp = rbuf;
-        //std::cout << (int)(*rp) << ' ';
     }
 
-    //'std::cout << (int)(*rp) << ' ';
+
     std::cout << rbuf[0];
     return *rp++;
 }
@@ -135,47 +129,33 @@ retry_sync:
         if (true){
             switch(id){
                 case HPPOSECEF:
-                    hd_res = Parser::parse_HD(true);
-                    for(auto const& val1: hd_res){
-                      std::cout << val1 << " ";
-                    }
+                    res = Parser::parse_HD(true);
+                    break;
                 case HPPOSLLH:
-                    hd_res = Parser::parse_HD(false);
-                    // for(auto const& val2: hd_res){
-                    //   std::cout << val2 << " ";
-                    // }
+                    res = Parser::parse_HD(false);
+                    break;
                 case POSECEF:
-                    std::cout << "ff";
                     res = Parser::parse(true);
-                    // for(auto const& val3: res){
-                    //   std::cout << val3 << " ";
-                    // }
+                    break;
                 case POSLLH:
-                    std::cout << "aff";
                     res = Parser::parse(false);
-                    // for(auto const& val4: res){
-                    //   std::cout << val4 << " ";
-                    // }
+                    break;
             }
-            for(auto const& val1: hd_res){
-              std::cout << val1 << " ";
+            for(auto const& val: res){
+              std::cout << val << " ";
             }
-            for(auto const& val4: res){
-              std::cout << val4 << " ";
-            }
-            std::cout<<'\n';
         }
 
-        std::cout << "error in checksum validation\n" << std::endl;
+        std::cout << "\nerror in checksum validation\n" << std::endl;
 
     }
 }
 
 
 // Generic func to parse hd message
-std::vector<float> Parser::parse_HD(bool if_Euler){
+std::vector<long double> Parser::parse_HD(bool if_Euler){
     std::vector<int> pre_result;
-    std::vector<float> result;
+    std::vector<long double> result;
 
     auto msg1_offset = (if_Euler) ? HD_EULER_MSG1_OFFSET : HD_POS_MSG1_OFFSET;
 
@@ -192,8 +172,10 @@ std::vector<float> Parser::parse_HD(bool if_Euler){
 
     auto payload = (if_Euler) ? HD_EULER_MSG_PAYLOAD_LEN : HD_POS_MSG_PAYLOAD_LEN;
 
+    auto scale = (if_Euler) ? 1 : 1e-7;
+
     for (auto i = msg1_offset; i <  msg1_offset + msg1_len; i+=4){
-       pre_result.push_back(int((signed char)(this->msg[i]) << 24 |
+       pre_result.push_back((long double)((signed char)(this->msg[i]) << 24 |
                                 (signed char)(this->msg[i+1]) << 16 |
                                 (signed char)(this->msg[i+2]) << 8 |
                                 (signed char)(this->msg[i+3])));
@@ -203,16 +185,17 @@ std::vector<float> Parser::parse_HD(bool if_Euler){
         pre_result.push_back(int((signed char)(this->msg[i])));
      }
 
-    for (auto i = 0; i < 2; i++){
-        result.push_back(pre_result[i] + (pre_result[i+offset] * 1e-2));
+    for (auto i = 0; i < offset; i++){
+        result.push_back(pre_result[i]*scale + (pre_result[i+offset] * 0.01));
+        std::cout << "d: " << pre_result[i]*scale + (pre_result[i+offset] * 0.01) << std::endl;
     }
     std::cout << "shd: " << result.size() << std::endl;
 
     return result;
 }
 
-std::vector<int> Parser::parse(bool if_Euler){
-    std::vector<int> result;
+std::vector<long double> Parser::parse(bool if_Euler){
+    std::vector<long double> result;
 
     auto msg_offset = (if_Euler) ? EULER_MSG_OFFSET : POS_MSG_OFFSET;
 
@@ -222,11 +205,15 @@ std::vector<int> Parser::parse(bool if_Euler){
 
     msg_offset += MSG_LEN;
 
+    auto scale = (if_Euler) ? 1 : 1e-7;
+
     for (auto i = msg_offset; i < msg_offset + msg_len; i+=4){
-        result.push_back(int((signed char)(this->msg[i]) << 24 |
+        result.push_back((long double)((signed char)(this->msg[i]) << 24 |
                              (signed char)(this->msg[i+1]) << 16 |
                              (signed char)(this->msg[i+2]) << 8 |
                              (signed char)(this->msg[i+3])));
+        //TODO: Fix scaling issue
+        result[i] = result[i]*scale;
     }
 
     std::cout << "s: " << result.size() << std::endl;
@@ -236,7 +223,7 @@ std::vector<int> Parser::parse(bool if_Euler){
 
 
 Parser::Parser(std::string filename = "testing.txt"){
-    //std::ifstream Parser::infile(filename);
+
     test_fd = open(filename.c_str(), O_RDWR);
 
 }
@@ -244,9 +231,9 @@ Parser::Parser(std::string filename = "testing.txt"){
 void Parser::write_for_test(std::string filename = "testing.txt"){
     Parser::test_fd = open(filename.c_str(), O_RDWR);
 
-    std::vector<int> data = {0x00, SYNC1, SYNC2, NAV_CLASS, POSECEF,
+    std::vector<int> data = {0x00, SYNC1, SYNC2, NAV_CLASS, POSLLH,
                 POS_MSG_PAYLOAD_LEN & 0x00FF, (POS_MSG_PAYLOAD_LEN & 0xFF00) >> 8};
-    signed char foo = 0x01;
+    signed char foo = 0x32;
 
     for (auto i=0; i < POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
         data.push_back(foo);
@@ -259,7 +246,7 @@ void Parser::write_for_test(std::string filename = "testing.txt"){
     data.push_back(SYNC1);
     data.push_back(SYNC2);
     data.push_back(NAV_CLASS);
-    data.push_back(POSECEF);
+    data.push_back(POSLLH);
     data.push_back(POS_MSG_PAYLOAD_LEN & 0x00FF);
     data.push_back((POS_MSG_PAYLOAD_LEN & 0xFF00) >> 8);
     for (auto i=0; i < POS_MSG_PAYLOAD_LEN + CHECKSUM_LEN; i++){
