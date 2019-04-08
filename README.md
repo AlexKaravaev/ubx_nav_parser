@@ -1,7 +1,7 @@
 # Parser for UBX messages
 Parser for NAV msgs in UBX protocol
 
-![UBX message structure](Dragster.jpg)
+![UBX message structure](img/ubx_msg.jpg)
 
 ### Supported messages types
 
