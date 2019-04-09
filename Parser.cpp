@@ -15,7 +15,7 @@ unsigned char Parser::getbyte(){
     }
 
 
-    std::cout << rbuf[0];
+    //std::cout << rbuf[0];
     return *rp++;
 }
 
@@ -67,28 +67,14 @@ retry_sync:
         chlb = getbyte();
         //TODO: When real checksum used , wipe off true below
         if (true || (chka == checka & chlb == checkb)){
-            switch(id){
-                case HPPOSECEF:
-                    res = Parser::parse_HD(true);
-                    break;
-                case HPPOSLLH:
-                    res = Parser::parse_HD(false);
-                    break;
-                case POSECEF:
-                    res = Parser::parse(true);
-                    break;
-                case POSLLH:
-                    res = Parser::parse(false);
-                    break;
-            }
-            if(verbose){
-              std::cout << "-----------------------------------\n";
-              std::cout <<"Msg class: " << (int)msg_class << " \n";
-              std::cout <<"id class: " << (int)id << " \n";
-              std::cout <<"length: " << (int)length << " \nPayload: ";
-              for(auto const& val: res){
-                std::cout << val << " ";
-              }
+          if(verbose){
+            std::cout << "-----------------------------------\n";
+            std::cout <<"Msg class: " << (int)msg_class << " \n";
+            std::cout <<"id class: " << (int)id << " \n";
+            std::cout <<"length: " << (int)length << " \nPayload: ";
+          }
+          Parser::parse_msg(id, verbose);
+          if(verbose){
               std::cout << "\n-----------------------------------\n";
               std::cout << "\n";
             }
@@ -99,71 +85,110 @@ retry_sync:
     }
 }
 
+long double Parser::parse_4_byte(int pos){
+  return (long double)((signed char)(msg[pos]) << 24 |
+                           (signed char)(msg[pos+1]) << 16 |
+                           (signed char)(msg[pos+2]) << 8 |
+                           (signed char)(msg[pos+3]));
+}
+
+long double Parser::parse_part(int pos, int bytes_long){
+  return (bytes_long==4) ? parse_4_byte(pos) : int((signed char)(msg[pos]));
+}
 
 // Generic func to parse hd message
-std::vector<long double> Parser::parse_HD(bool if_Euler){
-    std::vector<int> pre_result;
+void Parser::parse_msg(int id, bool if_verbose){
     std::vector<long double> result;
 
-    auto msg1_offset = (if_Euler) ? HD_EULER_MSG1_OFFSET : HD_POS_MSG1_OFFSET;
+    // push val in vector according to what part of the msg you need
+    // EX: part1 - from 0 byte to 4 byte 4 byte long -> msg_len_offset_bytes.push_back({0, 4, 4})
+    std::vector< std::vector <int> > msg_len_offset_bytes;
+    bool if_HP;
+    int offset;
+    long double scale;
 
-    auto msg1_len = (if_Euler) ? HD_EULER_MSG1_LEN : HD_POS_MSG1_LEN;
+    switch(id){
+      case HPPOSECEF:
 
-    auto msg2_offset = (if_Euler) ? HD_EULER_MSG2_OFFSET : HD_POS_MSG2_OFFSET;
+        {
+          msg_len_offset_bytes.push_back(std::vector<int> {HD_ECEF_MSG1_OFFSET,HD_ECEF_MSG1_LEN, 4});
+          msg_len_offset_bytes.push_back(std::vector<int> {HD_ECEF_MSG2_OFFSET,HD_ECEF_MSG2_LEN, 1});
+          offset = 3;
 
-    auto msg2_len = (if_Euler) ? HD_EULER_MSG2_LEN : HD_POS_MSG2_LEN;
+          scale = 1;
+          if_HP = true;
+          break;
+        }
+      case HPPOSLLH:
+      {
 
-    msg1_offset += MSG_LEN;
-    msg2_offset += MSG_LEN;
+        msg_len_offset_bytes.push_back(std::vector<int> {HD_POS_MSG1_OFFSET,HD_POS_MSG1_LEN, 4});
+        msg_len_offset_bytes.push_back(std::vector<int> {HD_POS_MSG2_OFFSET,HD_POS_MSG2_LEN, 1});
+        offset = 2;
 
-    auto offset = (if_Euler) ? 3 : 2;
+        scale = 1e-7;
+        if_HP = true;
+        break;
+      }
+      case POSLLH:
+      {
+        msg_len_offset_bytes.push_back(std::vector<int> {POS_MSG_OFFSET,POS_MSG_LEN, 4});
 
-    auto payload = (if_Euler) ? HD_EULER_MSG_PAYLOAD_LEN : HD_POS_MSG_PAYLOAD_LEN;
+        scale = 1e-7;
+        if_HP = false;
+        break;
+      }
+      case POSECEF:
+      {
+        msg_len_offset_bytes.push_back(std::vector<int> {ECEF_MSG_OFFSET,ECEF_MSG_LEN, 4});
 
-    auto scale = (if_Euler) ? 1 : 1e-7;
-
-    for (auto i = msg1_offset; i <  msg1_offset + msg1_len; i+=4){
-       pre_result.push_back((long double)((signed char)(msg[i]) << 24 |
-                                (signed char)(msg[i+1]) << 16 |
-                                (signed char)(msg[i+2]) << 8 |
-                                (signed char)(msg[i+3])));
-     }
-
-    for (auto i = msg2_offset; i < msg2_offset + msg2_len; i++){
-        pre_result.push_back(int((signed char)(msg[i])));
-     }
-
-    for (auto i = 0; i < offset; i++){
-        result.push_back(pre_result[i]*scale + (pre_result[i+offset] * 0.01));
+        scale = 1;
+        if_HP = false;
+        break;
+      }
     }
 
+    for (auto const& msg_part: msg_len_offset_bytes){
+      for (auto i = msg_part[0] + MSG_LEN; i <  msg_part[0] + MSG_LEN + msg_part[1]; i+=msg_part[2]){
+         result.push_back(parse_part(i, msg_part[2]));
+       }
 
-    return result;
-}
-
-std::vector<long double> Parser::parse(bool if_Euler){
-    std::vector<long double> result;
-
-    auto msg_offset = (if_Euler) ? EULER_MSG_OFFSET : POS_MSG_OFFSET;
-
-    auto msg_len = (if_Euler) ? EULER_MSG_LEN : POS_MSG_LEN;
-
-    auto payload = (if_Euler) ? EULER_MSG_PAYLOAD_LEN : POS_MSG_PAYLOAD_LEN;
-
-    msg_offset += MSG_LEN;
-
-    auto scale = (if_Euler) ? 1 : 1e-7;
-
-    for (auto i = msg_offset; i < msg_offset + msg_len; i+=4){
-        result.push_back(((signed char)(msg[i]) << 24 |
-                             (signed char)(msg[i+1]) << 16 |
-                             (signed char)(msg[i+2]) << 8 |
-                             (signed char)(msg[i+3])) * scale);
     }
+    
+    if(if_HP){
+      std::vector<long double> temp;
+      for (auto i = 0; i < offset; i++){
+          temp.push_back(result[i]*scale + (result[i+offset] * 0.01));
 
-    return result;
+      }
+      update(temp, id, if_verbose);
+    }
+    else{
+      update(result, id, if_verbose);
+    }
 }
 
+void Parser::update(std::vector<long double> result, char id, bool if_verbose){
+  if(if_verbose){
+    for(auto const& val: result){
+      std::cout << val << " ";
+    }
+  }
+  switch (id){
+    case POSLLH:
+      POS = result;
+      break;
+    case POSECEF:
+      ECEF = result;
+      break;
+    case HPPOSLLH:
+      HP_POS = result;
+      break;
+    case HPPOSECEF:
+      HP_ECEF = result;
+      break;
+  }
+}
 
 
 Parser::Parser(std::string filename = "testing.txt"){
