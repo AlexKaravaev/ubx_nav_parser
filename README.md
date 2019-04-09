@@ -3,6 +3,12 @@ Parser for NAV msgs in UBX protocol
 
 ![UBX message structure](img/ubx_msg.jpg)
 
+### Usage
+1. Change filename in main.cpp, from where information will come
+2. Compile: `g++ -std=c++11 main-cpp -o main`
+3. Run
+4. ????
+5. Profit
 ### Supported messages types
 
 - [x] HPPOSECEF - High-Precision coordinates in ECEF system.
