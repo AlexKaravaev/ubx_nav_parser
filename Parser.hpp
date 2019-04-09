@@ -22,6 +22,7 @@
 #define HPPOSLLH 0x14 // Msg class with high-precision position
 #define POSECEF 0x01// Msg class with usual ECEF angles
 #define POSLLH 0x02 // Msg class with usual position
+#define ATT 0x05 // Msg class with euler angles
 
 #define HD_ECEF_MSG_PAYLOAD_LEN 28
 #define HD_ECEF_MSG1_OFFSET 8
@@ -43,6 +44,10 @@
 #define ECEF_MSG_OFFSET 4
 #define ECEF_MSG_LEN 12
 
+#define ATT_MSG_PAYLOAD_LEN 32
+#define ATT_MSG_OFFSET 8
+#define ATT_MSG_LEN 12
+
 #define CHECKSUM_LEN 2
 
 #define MSG_LEN 2
@@ -58,7 +63,7 @@ class Parser{
         std::vector<long double> POS={};
         std::vector<long double> HP_ECEF={};
         std::vector<long double> HP_POS={};
-
+        std::vector<long double> EULER={};
     public:
         Parser(std::string filename);
         void read_data(bool verbose);

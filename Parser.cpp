@@ -146,11 +146,17 @@ void Parser::parse_msg(int id, bool if_verbose){
         if_HP = false;
         break;
       }
+      case ATT:
+        msg_len_offset_bytes.push_back(std::vector<int> {ATT_MSG_OFFSET, ATT_MSG_LEN, 4});
+
+        scale = 1e-5;
+        if_HP = false;
+        break;
     }
 
     for (auto const& msg_part: msg_len_offset_bytes){
       for (auto i = msg_part[0] + MSG_LEN; i <  msg_part[0] + MSG_LEN + msg_part[1]; i+=msg_part[2]){
-         result.push_back(parse_part(i, msg_part[2]));
+         result.push_back(scale*parse_part(i, msg_part[2]));
        }
 
     }
@@ -158,7 +164,7 @@ void Parser::parse_msg(int id, bool if_verbose){
     if(if_HP){
       std::vector<long double> temp;
       for (auto i = 0; i < offset; i++){
-          temp.push_back(result[i]*scale + (result[i+offset] * 0.01));
+          temp.push_back(result[i] + (result[i+offset] * 0.01));
 
       }
       update(temp, id, if_verbose);
@@ -186,6 +192,9 @@ void Parser::update(std::vector<long double> result, char id, bool if_verbose){
       break;
     case HPPOSECEF:
       HP_ECEF = result;
+      break;
+    case ATT:
+      EULER = result;
       break;
   }
 }
@@ -236,6 +245,7 @@ void Parser::write_for_test(std::string filename = "testing.txt"){
 
     fill_data(NAV_CLASS, HPPOSLLH, HD_POS_MSG_PAYLOAD_LEN, data);
 
+    fill_data(NAV_CLASS, ATT, ATT_MSG_PAYLOAD_LEN, data);
     std::ofstream of(filename);
 
     std::ostream_iterator<char> out_iterator(of, "");
