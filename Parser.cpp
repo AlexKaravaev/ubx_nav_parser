@@ -154,7 +154,7 @@ void Parser::parse_msg(int id, bool if_verbose){
        }
 
     }
-    
+
     if(if_HP){
       std::vector<long double> temp;
       for (auto i = 0; i < offset; i++){
@@ -193,8 +193,11 @@ void Parser::update(std::vector<long double> result, char id, bool if_verbose){
 
 Parser::Parser(std::string filename = "testing.txt"){
 
-    test_fd = open(filename.c_str(), O_RDWR);
 
+    test_fd = open(filename.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if(test_fd < 0){
+      std::cout << "Error while opening file\n";
+    }
 }
 
 void fill_data(char msg_class, char msg_id, char msg_len, std::vector<int> &data){
